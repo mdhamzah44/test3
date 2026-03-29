@@ -52,6 +52,7 @@ teachers_col = db["teachers"]
 reviews_col = db["reviews"]
 followers_col = db["followers"]
 notes_col = db["notes"]
+tests = list(tests_col.find({"name": regex}))
 
 # ---------------- Required Decorator ----------------
 
