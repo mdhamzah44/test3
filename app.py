@@ -1306,6 +1306,10 @@ def handle_ice(data):
 def health():
     return jsonify({"status": "ok"}), 200
 
+@app.errorhandler(500)
+def internal_error(e):
+    return f"500 ERROR: {str(e)}", 500
+
 # ---------------- Run ----------------
 if __name__ == "__main__":
     socketio.run(app, debug=True)
