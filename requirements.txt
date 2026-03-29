@@ -7,3 +7,4 @@ Werkzeug==3.0.1
 pdfkit==1.0.0
 cloudinary==1.36.0
 gunicorn
+eventlet
