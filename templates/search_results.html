@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Search Results</title>
+    <style>
+        body{font-family:Poppins;background:#f8fafc;padding:30px;}
+
+        h2{margin-bottom:15px;color:#1e293b;}
+
+        .section{margin-bottom:30px;}
+
+        .card{
+            background:white;
+            padding:15px;
+            border-radius:12px;
+            margin-bottom:10px;
+            box-shadow:0 5px 15px rgba(0,0,0,0.08);
+            cursor:pointer;
+            transition:0.2s;
+        }
+
+        .card:hover{
+            transform:translateY(-3px);
+        }
+    </style>
+</head>
+<body>
+
+<h1>🔍 Results for "{{ query }}"</h1>
+
+<!-- COURSES -->
+<div class="section">
+    <h2>📚 Courses</h2>
+
+    {% for c in courses %}
+        <div class="card" onclick="location.href='/course/{{ c.course_id }}'">
+            <strong>{{ c.name }}</strong>
+            <p>{{ c.desc }}</p>
+        </div>
+    {% else %}
+        <p>No courses found</p>
+    {% endfor %}
+</div>
+
+<!-- TEACHERS -->
+<div class="section">
+    <h2>👨‍🏫 Teachers</h2>
+
+    {% for t in teachers %}
+        <div class="card" onclick="location.href='/teacher/{{ t.id }}'">
+            <strong>{{ t.fullname }}</strong>
+            <p>{{ t.category }}</p>
+        </div>
+    {% else %}
+        <p>No teachers found</p>
+    {% endfor %}
+</div>
+
+<!-- TESTS -->
+<div class="section">
+    <h2>📝 Tests</h2>
+
+    {% for t in tests %}
+        <div class="card" onclick="location.href='/test/{{ t.test_id }}'">
+            <strong>{{ t.name }}</strong>
+        </div>
+    {% else %}
+        <p>No tests found</p>
+    {% endfor %}
+</div>
+
+<br>
+<a href="/LPstudenthome">⬅ Back to Dashboard</a>
+
+</body>
+</html>

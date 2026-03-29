@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ course.name }}</title>
+    <style>
+        body{font-family:Poppins;background:#f8fafc;padding:30px;}
+        .card{
+            max-width:600px;margin:auto;background:white;
+            padding:25px;border-radius:16px;
+            box-shadow:0 10px 25px rgba(0,0,0,0.1);
+        }
+        h1{color:#2563eb;}
+        p{color:#64748b;}
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>{{ course.name }}</h1>
+    <p>{{ course.desc }}</p>
+
+    <p><strong>Category:</strong> {{ course.category }}</p>
+    <p><strong>Total Classes:</strong> {{ course.total_classes }}</p>
+
+    <a href="/LPstudenthome">⬅ Back</a>
+</div>
+
+</body>
+</html>

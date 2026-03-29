@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Courses - SmartEdu</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+
+<style>
+
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:'Poppins',sans-serif;
+}
+
+body{
+background:#f3f4f6;
+color:#333;
+}
+
+/* NAVBAR */
+
+nav{
+display:flex;
+justify-content:space-between;
+align-items:center;
+padding:20px 8%;
+background:white;
+box-shadow:0 2px 10px rgba(0,0,0,.1);
+}
+
+.logo{
+font-size:26px;
+font-weight:600;
+color:#2563eb;
+}
+
+nav ul{
+display:flex;
+list-style:none;
+}
+
+nav ul li{
+margin:0 15px;
+}
+
+nav ul li a{
+text-decoration:none;
+color:#333;
+font-weight:500;
+}
+
+/* Hover text color */
+
+nav ul li a:hover{
+color:#2563eb;
+}
+
+/* Underline animation */
+
+nav ul li a::after{
+content:"";
+position:absolute;
+width:0;
+height:2px;
+left:0;
+bottom:-5px;
+background:#2563eb;
+transition:0.3s;
+}
+
+nav ul li a:hover::after{
+width:100%;
+}
+
+/* HEADER */
+
+.header{
+padding:60px 8%;
+text-align:center;
+background:#eef2ff;
+}
+
+.header h1{
+color:#2563eb;
+font-size:40px;
+}
+
+/* COURSE SECTION */
+
+.courses{
+padding:60px 8%;
+}
+
+.course{
+background:white;
+padding:25px;
+border-radius:10px;
+margin-bottom:25px;
+box-shadow:0 5px 20px rgba(0,0,0,.1);
+}
+
+.course h2{
+color:#2563eb;
+margin-bottom:10px;
+}
+
+.course p{
+margin:5px 0;
+}
+
+.course ul{
+margin:10px 0;
+padding-left:20px;
+}
+
+.course button{
+margin-top:10px;
+padding:10px 18px;
+background:#2563eb;
+color:white;
+border:none;
+border-radius:6px;
+cursor:pointer;
+}
+
+/* FOOTER */
+
+footer{
+text-align:center;
+padding:30px;
+background:#e5e7eb;
+margin-top:40px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<nav>
+
+<div class="logo">SmartEdu</div>
+
+<ul>
+<li><a href="{{ url_for('LPfront')}}"> Home</a></li>
+<li><a href="{{ url_for('LPbookstore')}}"> Book Store</a></li>
+<li><a href="{{ url_for('LPteachershome')}}"> Teacher Dashboard</a></li>
+<li><a href="{{ url_for('LPstudenthome')}}"> Student Home</a></li>
+<li><a href="{{ url_for('LPliveclasses')}}"> Live classes</a></li>
+<li><a href="#">Reviews</a></li>
+</ul>
+
+</nav>
+
+<section class="header">
+
+<h1>Our Courses</h1>
+<p>Choose the best course for your career</p>
+
+</section>
+
+<section class="courses">
+
+<!-- COURSE 1 -->
+
+<div class="course">
+
+<h2>JEE Preparation</h2>
+
+<p><b>Fees:</b> ₹25,000</p>
+<p><b>Duration:</b> 12 Months</p>
+
+<p><b>Scope:</b> Engineering entrance preparation for IIT, NIT and top colleges.</p>
+
+<p><b>Why choose this course:</b></p>
+
+<ul>
+<li>Expert faculty</li>
+<li>Daily live classes</li>
+<li>Practice tests</li>
+<li>Doubt solving sessions</li>
+</ul>
+
+<button onclick="pay()">Pay Fees</button>
+
+</div>
+
+<!-- COURSE 2 -->
+
+<div class="course">
+
+<h2>NEET Preparation</h2>
+
+<p><b>Fees:</b> ₹28,000</p>
+<p><b>Duration:</b> 12 Months</p>
+
+<p><b>Scope:</b> Medical entrance preparation for MBBS and BDS.</p>
+
+<p><b>Why choose this course:</b></p>
+
+<ul>
+<li>Experienced teachers</li>
+<li>Weekly mock tests</li>
+<li>Detailed notes</li>
+<li>Live doubt sessions</li>
+</ul>
+
+<button onclick="pay()">Pay Fees</button>
+
+</div>
+
+<!-- COURSE 3 -->
+
+<div class="course">
+
+<h2>Web Development</h2>
+
+<p><b>Fees:</b> ₹9,000 </p>
+<p><b>Duration:</b>5 Months </p>
+
+<p><b>Scope:</b> Become a website developer and work as freelancer or in IT companies.</p>
+
+<p><b>Why choose this course:</b></p>
+
+<ul>
+<li>Learn HTML, CSS, JavaScript</li>
+<li>Real projects</li>
+<li>Portfolio building</li>
+<li>Career guidance</li>
+</ul>
+
+<button onclick="pay()">Pay Fees</button>
+</div>
+
+<!--course 3 -->
+
+<div class="course">
+
+<h2>Digital Marketing</h2>
+
+<p><b>Fees:</b> ₹</p>
+<p><b>Duration:</b> 4 Months</p>
+
+<p><b>Scope:</b> Become a website developer and work as freelancer or in IT companies.</p>
+
+<p><b>Why choose this course:</b></p>
+
+<ul>
+<li>Learn HTML, CSS, JavaScript</li>
+<li>Real projects</li>
+<li>Portfolio building</li>
+<li>Career guidance</li>
+</ul>
+
+<button onclick="pay()">Pay Fees</button>
+
+</div>
+
+</section>
+
+<footer>
+
+<p>© 2026 SmartEdu</p>
+
+</footer>
+
+<script>
+
+function pay(){
+alert("Payment feature will be available soon")
+}
+
+</script>
+
+</body>
+</html>

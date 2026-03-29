@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ test.name }}</title>
+    <style>
+        body{font-family:Poppins;background:#f8fafc;padding:30px;}
+        .card{
+            max-width:600px;margin:auto;background:white;
+            padding:25px;border-radius:16px;
+            box-shadow:0 10px 25px rgba(0,0,0,0.1);
+        }
+        h1{color:#2563eb;}
+        p{color:#64748b;}
+        .btn{
+            display:inline-block;
+            margin-top:15px;
+            padding:10px 15px;
+            background:#2563eb;
+            color:white;
+            border-radius:10px;
+            text-decoration:none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>{{ test.name }}</h1>
+
+    <p><strong>Total Questions:</strong> {{ test.total_questions }}</p>
+
+    <a href="#" class="btn">Start Test 🚀</a>
+
+    <br><br>
+    <a href="/LPstudenthome">⬅ Back</a>
+</div>
+
+</body>
+</html>

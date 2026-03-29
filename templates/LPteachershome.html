@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SmartEdu Teacher</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:'Poppins',sans-serif;}
+
+body{
+  display:flex;
+  background:#f1f5f9;
+}
+
+/* SIDEBAR */
+.sidebar{
+  width:240px;
+  height:100vh;
+  background:#ffffff;
+  padding:25px 15px;
+  border-right:1px solid #e5e7eb;
+}
+
+.logo{
+  font-size:20px;
+  font-weight:600;
+  color:#2563eb;
+  margin-bottom:30px;
+  padding-left:10px;
+}
+
+.menu-item{
+  padding:12px 15px;
+  margin:6px 0;
+  border-radius:10px;
+  cursor:pointer;
+  color:#475569;
+  transition:0.25s;
+}
+
+.menu-item:hover{
+  background:#eef2ff;
+  color:#2563eb;
+}
+
+.active{
+  background:#2563eb;
+  color:white;
+}
+
+/* MAIN */
+.main{
+  flex:1;
+}
+
+/* HEADER */
+.header{
+  height:70px;
+  background:white;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:0 25px;
+  border-bottom:1px solid #e5e7eb;
+}
+
+.search{
+  padding:8px 15px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  width:220px;
+}
+
+/* PROFILE */
+.profile{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+  position:relative;
+}
+
+.profile img{
+  width:36px;
+  border-radius:50%;
+}
+
+.dropdown{
+  position:absolute;
+  top:50px;
+  right:0;
+  background:white;
+  width:180px;
+  border-radius:10px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.08);
+  display:none;
+}
+
+.dropdown div{
+  padding:12px;
+  font-size:14px;
+}
+
+.dropdown div:hover{
+  background:#f1f5f9;
+}
+
+/* CONTENT */
+.content{
+  padding:25px;
+}
+
+.section{display:none;}
+.section.active{display:block;}
+
+/* CARDS */
+.cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:20px;
+}
+
+.card{
+  background:white;
+  padding:20px;
+  border-radius:14px;
+  box-shadow:0 5px 15px rgba(0,0,0,0.05);
+}
+
+.card h4{
+  font-size:14px;
+  color:#64748b;
+}
+
+.card p{
+  font-size:22px;
+  font-weight:600;
+  margin-top:5px;
+}
+
+/* BUTTON */
+.btn{
+  background:#2563eb;
+  color:white;
+  border:none;
+  padding:10px 16px;
+  border-radius:8px;
+  cursor:pointer;
+  font-size:14px;
+  transition:0.25s;
+}
+
+.btn:hover{
+  background:#1d4ed8;
+  transform: translatey(-1px);
+}
+
+
+/* TABLE */
+table{
+  width:100%;
+  margin-top:20px;
+  border-collapse:separate;
+  border-spacing:0;
+  background:white;
+  border-radius:12px;
+  overflow:hidden;
+  box-shadow:0 4px 12px rgba(0,0,0,0.05);
+}
+
+th,td{
+  padding:14px;
+  text-align:left;
+  font-size:14px;
+}
+
+th{
+  background:#ffffff;   
+  color:#64748b;
+  font-weight:500;
+}
+
+tr{
+  border-bottom:1px solid #eee;
+}
+
+tr:hover{
+  background:#f9fafb;
+}
+
+
+/* DARK MODE */
+.dark{
+  background:#0f172a;
+  color:white;
+}
+
+.dark .sidebar,
+.dark .header,
+.dark .card,
+.dark table{
+  background:#1e293b;
+  color:white;
+}
+
+.dark th{
+    background:#1e293b;
+    color: #cbd5f5;
+}
+
+.dark tr :hover{
+    background:#334155;
+
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="logo">SmartEdu</div>
+
+  <div class="menu-item active" onclick="show('dashboard',this)">Dashboard</div>
+  <div class="menu-item" onclick="show('courses',this)">My Courses</div>
+  <div class="menu-item" onclick="show('students',this)">Students</div>
+  <div class="menu-item" onclick="show('assignments',this)">Assignments</div>
+  <div class="menu-item" onclick="show('live',this)">Live Classes</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- HEADER -->
+  <div class="header">
+    <input type="text" placeholder="Search..." class="search">
+
+    <div class="profile" onclick="toggleMenu()">
+      <img src="https://i.pravatar.cc/40">
+      <span>Teacher</span>
+
+      <div class="dropdown" id="menu">
+        <div onclick="toggleDark()">🌙 Dark Mode</div>
+        <div>⚙ Settings</div>
+        <div>🚪 Logout</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div id="dashboard" class="section active">
+      <div class="cards">
+        <div class="card"><h4>Total Students</h4><p>120</p></div>
+        <div class="card"><h4>Courses</h4><p>5</p></div>
+        <div class="card"><h4>Earnings</h4><p>₹12,000</p></div>
+        <div class="card"><h4>Pending Reviews</h4><p>8</p></div>
+      </div>
+    </div>
+
+    <!-- COURSES -->
+    <div id="courses" class="section">
+      <h2>My Courses</h2>
+      <button class="btn">+ Add Course</button>
+
+      <table>
+        <tr><th>Course</th><th>Students</th><th>Status</th></tr>
+        <tr><td>Web Development</td><td>50</td><td>Active</td></tr>
+        <tr><td>Python</td><td>40</td><td>Active</td></tr>
+      </table>
+    </div>
+
+    <!-- STUDENTS -->
+    <div id="students" class="section">
+      <h2>Students</h2>
+      <table>
+        <tr><th>Name</th><th>Course</th><th>Progress</th></tr>
+        <tr><td>Ali</td><td>Web Dev</td><td>80%</td></tr>
+      </table>
+    </div>
+
+    <!-- ASSIGNMENTS -->
+    <div id="assignments" class="section">
+      <h2>Assignments</h2>
+      <button class="btn">Upload Assignment</button>
+    </div>
+
+    <!-- LIVE -->
+    <div id="live" class="section">
+      <h2>Live Classes</h2>
+      <button class="btn">Start Class</button>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+function show(id, el){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.menu-item').forEach(m=>m.classList.remove('active'));
+
+  document.getElementById(id).classList.add('active');
+  el.classList.add('active');
+}
+
+function toggleMenu(){
+  let menu=document.getElementById('menu');
+  menu.style.display = menu.style.display==='block'?'none':'block';
+}
+
+function toggleDark(){
+  document.body.classList.toggle('dark');
+}
+</script>
+
+</body>
+</html>
