@@ -9,7 +9,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 
 @app.route("/")
 def home():
-    return "WebRTC Flask Signaling Server Running"
+    return "<html> <h2>Welcome to the server by Hamzah</h2></html>"
 
 @socketio.on("join")
 def join(data):
