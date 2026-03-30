@@ -1,26 +1,28 @@
-from flask import Flask
-from flask_socketio import SocketIO, emit, join_room
-from flask_cors import CORS
+from flask import Flask, request
+from flask_socketio import SocketIO, join_room, emit
 
 app = Flask(__name__)
-CORS(app)
+app.config["SECRET_KEY"] = "secret"
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 @app.route("/")
 def home():
-    return "WebRTC Flask Signaling Server Running"
+    return "Server Running ✅"
 
-@app.route("/join", methods=["POST"])
-def join():
-    class_id = request.form["class_id"]
-    role = request.form["role"]
+# 🔥 JOIN ROOM
+@socketio.on("join-room")
+def join_room_handler(data):
+    room = data["class_id"]
+    join_room(room)
 
-    if role == "teacher":
-        return render_template("teacher.html", class_id=class_id)
-    else:
-        return render_template("student.html", class_id=class_id)
+    print("User joined:", request.sid, "Room:", room)
 
+    emit("user-joined", {
+        "user_id": request.sid
+    }, room=room, include_self=False)
+
+# 🔥 OFFER
 @socketio.on("offer")
 def offer(data):
     emit("offer", {
@@ -28,6 +30,7 @@ def offer(data):
         "from": request.sid
     }, to=data["to"])
 
+# 🔥 ANSWER
 @socketio.on("answer")
 def answer(data):
     emit("answer", {
@@ -35,6 +38,7 @@ def answer(data):
         "from": request.sid
     }, to=data["to"])
 
+# 🔥 ICE
 @socketio.on("ice-candidate")
 def ice(data):
     emit("ice-candidate", {
