@@ -46,5 +46,40 @@ def ice(data):
         "from": request.sid
     }, to=data["to"])
 
+
+# ✏️ DRAW START
+@socketio.on("draw-start")
+def handle_draw_start(data):
+    room = data["class_id"]
+
+    emit("draw-start", {
+        "x": data["x"],
+        "y": data["y"]
+    }, room=room, include_self=False)
+
+
+# ✏️ DRAW MOVE
+@socketio.on("draw")
+def handle_draw(data):
+    room = data["class_id"]
+
+    emit("draw", {
+        "x": data["x"],
+        "y": data["y"]
+    }, room=room, include_self=False)
+
+
+# ✏️ DRAW END
+@socketio.on("draw-end")
+def handle_draw_end(data):
+    room = data["class_id"]
+
+    emit("draw-end", {}, room=room, include_self=False)
+
+
+@socketio.on("clear-canvas")
+def clear_canvas(data):
+    emit("clear-canvas", {}, room=data["class_id"])
+
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)
