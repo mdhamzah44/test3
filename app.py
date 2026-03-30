@@ -11,23 +11,35 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 def home():
     return "WebRTC Flask Signaling Server Running"
 
-@socketio.on("join")
-def join(data):
-    room = data["room"]
+@socketio.on("join-room")
+def join_room_handler(data):
+    room = data["class_id"]
     join_room(room)
-    emit("user-joined", room=room, include_self=False)
+
+    emit("user-joined", {
+        "user_id": request.sid
+    }, room=room, include_self=False)
 
 @socketio.on("offer")
 def offer(data):
-    emit("offer", data["offer"], room=data["room"], include_self=False)
+    emit("offer", {
+        "offer": data["offer"],
+        "from": request.sid
+    }, to=data["to"])
 
 @socketio.on("answer")
 def answer(data):
-    emit("answer", data["answer"], room=data["room"], include_self=False)
+    emit("answer", {
+        "answer": data["answer"],
+        "from": request.sid
+    }, to=data["to"])
 
 @socketio.on("ice-candidate")
 def ice(data):
-    emit("ice-candidate", data["candidate"], room=data["room"], include_self=False)
+    emit("ice-candidate", {
+        "candidate": data["candidate"],
+        "from": request.sid
+    }, to=data["to"])
 
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)
