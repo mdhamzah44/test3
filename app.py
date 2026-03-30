@@ -11,14 +11,15 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 def home():
     return "WebRTC Flask Signaling Server Running"
 
-@socketio.on("join-room")
-def join_room_handler(data):
-    room = data["class_id"]
-    join_room(room)
+@app.route("/join", methods=["POST"])
+def join():
+    class_id = request.form["class_id"]
+    role = request.form["role"]
 
-    emit("user-joined", {
-        "user_id": request.sid
-    }, room=room, include_self=False)
+    if role == "teacher":
+        return render_template("teacher.html", class_id=class_id)
+    else:
+        return render_template("student.html", class_id=class_id)
 
 @socketio.on("offer")
 def offer(data):
