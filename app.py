@@ -81,5 +81,29 @@ def handle_draw_end(data):
 def clear_canvas(data):
     emit("clear-canvas", {}, room=data["class_id"])
 
+
+# 🔗 REQUEST CONNECTION
+@socketio.on("request-connection")
+def request_connection(data):
+    room = data["class_id"]
+
+    emit("incoming-request", {
+        "from": request.sid
+    }, room=room, include_self=False)
+
+
+# ✅ ACCEPT
+@socketio.on("accept-connection")
+def accept_connection(data):
+    emit("connection-accepted", {
+        "from": request.sid
+    }, to=data["to"])
+
+
+# ❌ REJECT
+@socketio.on("reject-connection")
+def reject_connection(data):
+    emit("connection-rejected", {}, to=data["to"])
+
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)
