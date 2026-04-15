@@ -14,7 +14,7 @@ canvas_data = {}
 
 @app.route("/")
 def home():
-    return "Server Running ✅"
+    return "Server Running ✅ 13.0.1.56"
 
 
 # =========================
