@@ -1,9 +1,13 @@
 import os
 from flask import Flask, request
+from flask_cors import CORS
 from flask_socketio import SocketIO, join_room, emit
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret"
+
+# Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 socketio = SocketIO(
     app,
