@@ -3,45 +3,47 @@ from flask_socketio import SocketIO, join_room, emit
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret"
-
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# =========================
-# 🧠 STORE CANVAS DATA
-# =========================
-# { class_id: [ {type, x, y} ] }
+# { class_id: { slide_index: [draw_data] } }
 canvas_data = {}
+
+# { class_id: current_slide }
+current_slide = {}
+
 
 @app.route("/")
 def home():
-    return "Server Running ✅ 13.0.1.56"
+    return "Server Running ✅"
 
 
 # =========================
-# 🔥 JOIN ROOM
+# JOIN ROOM
 # =========================
 @socketio.on("join-room")
 def join_room_handler(data):
     room = data["class_id"]
     join_room(room)
 
-    print("User joined:", request.sid, "Room:", room)
+    canvas_data.setdefault(room, {})
+    current_slide.setdefault(room, 0)
 
-    # 🔥 SEND PREVIOUS DRAWING TO NEW USER
-    old_data = canvas_data.get(room, [])
-    emit("load-canvas", old_data)
+    slide = current_slide[room]
+    old_data = canvas_data[room].get(slide, [])
 
-    # Notify others
+    emit("load-canvas", {
+        "data": old_data,
+        "slide": slide
+    })
+
     emit("user-joined", {
         "user_id": request.sid
     }, room=room, include_self=False)
 
 
 # =========================
-# 🔥 WEBRTC SIGNALING
+# WEBRTC SIGNALING
 # =========================
-
-# OFFER
 @socketio.on("offer")
 def offer(data):
     emit("offer", {
@@ -50,7 +52,6 @@ def offer(data):
     }, to=data["to"])
 
 
-# ANSWER
 @socketio.on("answer")
 def answer(data):
     emit("answer", {
@@ -59,7 +60,6 @@ def answer(data):
     }, to=data["to"])
 
 
-# ICE CANDIDATE
 @socketio.on("ice-candidate")
 def ice(data):
     emit("ice-candidate", {
@@ -69,49 +69,46 @@ def ice(data):
 
 
 # =========================
-# 🎨 CANVAS DRAWING
+# DRAWING
 # =========================
+def get_slide(room):
+    return current_slide.get(room, 0)
 
-# DRAW START
+
 @socketio.on("draw-start")
-def handle_draw_start(data):
+def draw_start(data):
     room = data["class_id"]
+    slide = get_slide(room)
 
-    canvas_data.setdefault(room, []).append({
+    canvas_data.setdefault(room, {}).setdefault(slide, []).append({
         "type": "start",
         "x": data["x"],
         "y": data["y"]
     })
 
-    emit("draw-start", {
-        "x": data["x"],
-        "y": data["y"]
-    }, room=room, include_self=False)
+    emit("draw-start", data, room=room, include_self=False)
 
 
-# DRAW MOVE
 @socketio.on("draw")
-def handle_draw(data):
+def draw(data):
     room = data["class_id"]
+    slide = get_slide(room)
 
-    canvas_data.setdefault(room, []).append({
+    canvas_data[room][slide].append({
         "type": "draw",
         "x": data["x"],
         "y": data["y"]
     })
 
-    emit("draw", {
-        "x": data["x"],
-        "y": data["y"]
-    }, room=room, include_self=False)
+    emit("draw", data, room=room, include_self=False)
 
 
-# DRAW END
 @socketio.on("draw-end")
-def handle_draw_end(data):
+def draw_end(data):
     room = data["class_id"]
+    slide = get_slide(room)
 
-    canvas_data.setdefault(room, []).append({
+    canvas_data[room][slide].append({
         "type": "end"
     })
 
@@ -119,20 +116,52 @@ def handle_draw_end(data):
 
 
 # =========================
-# 🧽 CLEAR CANVAS
+# CLEAR
 # =========================
 @socketio.on("clear-canvas")
 def clear_canvas(data):
     room = data["class_id"]
+    slide = get_slide(room)
 
-    # 🔥 RESET STORED DATA
-    canvas_data[room] = []
+    canvas_data[room][slide] = []
 
     emit("clear-canvas", {}, room=room)
 
 
 # =========================
-# 🚀 RUN SERVER
+# SLIDES
 # =========================
+
+@socketio.on("add-slide")
+def add_slide(data):
+    room = data["class_id"]
+
+    slides = canvas_data.setdefault(room, {})
+    new_index = len(slides)
+
+    slides[new_index] = []
+    current_slide[room] = new_index
+
+    emit("slide-changed", {
+        "slide": new_index,
+        "data": []
+    }, room=room)
+
+
+@socketio.on("change-slide")
+def change_slide(data):
+    room = data["class_id"]
+    slide = data["slide"]
+
+    current_slide[room] = slide
+
+    slide_data = canvas_data.get(room, {}).get(slide, [])
+
+    emit("slide-changed", {
+        "slide": slide,
+        "data": slide_data
+    }, room=room)
+
+
 if __name__ == "__main__":
     socketio.run(app, host="0.0.0.0", port=5000)
