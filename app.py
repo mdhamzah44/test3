@@ -5,7 +5,6 @@ from flask_socketio import SocketIO, join_room, emit
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret"
 
-# IMPORTANT: async_mode must match worker
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
@@ -15,7 +14,7 @@ socketio = SocketIO(
 # { class_id: { slide_index: [draw_data] } }
 canvas_data = {}
 
-# { class_id: current_slide }
+# { class_id: current_slide_index }
 current_slide = {}
 
 
@@ -38,11 +37,13 @@ def join_room_handler(data):
     slide = current_slide[room]
     old_data = canvas_data[room].get(slide, [])
 
+    # Send existing canvas state to the joining client only
     emit("load-canvas", {
         "data": old_data,
         "slide": slide
     })
 
+    # Notify others in the room that a new user joined
     emit("user-joined", {
         "user_id": request.sid
     }, room=room, include_self=False)
@@ -93,6 +94,7 @@ def draw_start(data):
         "y": data["y"]
     })
 
+    # Broadcast to everyone else in the room
     emit("draw-start", data, room=room, include_self=False)
 
 
@@ -132,7 +134,8 @@ def clear_canvas(data):
 
     canvas_data[room][slide] = []
 
-    emit("clear-canvas", {}, room=room)
+    # FIX: include_self=False so teacher doesn't double-clear locally
+    emit("clear-canvas", {}, room=room, include_self=False)
 
 
 # =========================
@@ -148,6 +151,7 @@ def add_slide(data):
     slides[new_index] = []
     current_slide[room] = new_index
 
+    # Broadcast to everyone (teacher included so UI updates)
     emit("slide-changed", {
         "slide": new_index,
         "data": []
@@ -159,10 +163,14 @@ def change_slide(data):
     room = data["class_id"]
     slide = data["slide"]
 
+    # Clamp to valid range
+    slides = canvas_data.get(room, {})
+    slide = max(0, min(slide, len(slides) - 1))
+
     current_slide[room] = slide
+    slide_data = slides.get(slide, [])
 
-    slide_data = canvas_data.get(room, {}).get(slide, [])
-
+    # Broadcast to everyone
     emit("slide-changed", {
         "slide": slide,
         "data": slide_data
