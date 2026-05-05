@@ -1,9 +1,16 @@
+import os
 from flask import Flask, request
 from flask_socketio import SocketIO, join_room, emit
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret"
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# IMPORTANT: async_mode must match worker
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="gevent"
+)
 
 # { class_id: { slide_index: [draw_data] } }
 canvas_data = {}
@@ -131,7 +138,6 @@ def clear_canvas(data):
 # =========================
 # SLIDES
 # =========================
-
 @socketio.on("add-slide")
 def add_slide(data):
     room = data["class_id"]
@@ -163,5 +169,9 @@ def change_slide(data):
     }, room=room)
 
 
+# =========================
+# RUN
+# =========================
 if __name__ == "__main__":
-    socketio.run(app, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    socketio.run(app, host="0.0.0.0", port=port)
