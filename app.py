@@ -6,7 +6,6 @@ from flask_socketio import SocketIO, join_room, emit
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "secret"
 
-# Enable CORS for all routes
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 socketio = SocketIO(
@@ -20,6 +19,17 @@ canvas_data = {}
 
 # { class_id: current_slide_index }
 current_slide = {}
+
+# =============================================
+# POLL STATE
+# { class_id: {
+#     poll_id, poll_type, options, timer,
+#     question_num, correct (None until ended),
+#     responses: { user_id: answer_index },
+#     active: bool
+# } }
+# =============================================
+poll_state = {}
 
 
 @app.route("/")
@@ -37,6 +47,13 @@ def ensure_room(room):
     canvas_data.setdefault(room, {0: None})
     current_slide.setdefault(room, 0)
 
+def ensure_poll(room):
+    poll_state.setdefault(room, {
+        "poll_id": None,
+        "active": False,
+        "responses": {}
+    })
+
 
 # =========================
 # JOIN ROOM
@@ -46,20 +63,30 @@ def join_room_handler(data):
     room = data["class_id"]
     join_room(room)
     ensure_room(room)
+    ensure_poll(room)
 
     slide = current_slide[room]
     image = canvas_data[room].get(slide)
 
-    # Send current canvas state (as image) to the joining client only
     emit("load-canvas", {
         "image": image,
         "slide": slide
     })
 
-    # Notify others that a new user joined (for WebRTC offer)
     emit("user-joined", {
         "user_id": request.sid
     }, room=room, include_self=False)
+
+    # If there's an active poll, send it to the newly joined student
+    poll = poll_state.get(room, {})
+    if poll.get("active"):
+        emit("poll-start", {
+            "poll_id": poll["poll_id"],
+            "poll_type": poll["poll_type"],
+            "options": poll["options"],
+            "timer": poll.get("timer_remaining", poll.get("timer", 30)),
+            "question_num": poll.get("question_num", 1)
+        })
 
 
 # =========================
@@ -90,7 +117,7 @@ def ice(data):
 
 
 # =========================
-# DRAWING (live stroke relay — no storage needed, image is source of truth)
+# DRAWING
 # =========================
 @socketio.on("draw-start")
 def draw_start(data):
@@ -117,7 +144,7 @@ def draw_end(data):
 
 
 # =========================
-# CANVAS IMAGE (source of truth for persistence)
+# CANVAS IMAGE
 # =========================
 @socketio.on("canvas-image")
 def canvas_image(data):
@@ -128,7 +155,6 @@ def canvas_image(data):
     ensure_room(room)
     canvas_data[room][slide] = image
 
-    # Relay to all other clients so they stay in sync
     emit("canvas-image-update", {
         "slide": slide,
         "image": image
@@ -142,10 +168,8 @@ def canvas_image(data):
 def clear_canvas(data):
     room = data["class_id"]
     slide = get_slide(room)
-
     ensure_room(room)
     canvas_data[room][slide] = None
-
     emit("clear-canvas", {}, room=room, include_self=False)
 
 
@@ -156,16 +180,11 @@ def clear_canvas(data):
 def add_slide(data):
     room = data["class_id"]
     ensure_room(room)
-
     slides = canvas_data[room]
     new_index = len(slides)
     slides[new_index] = None
     current_slide[room] = new_index
-
-    emit("slide-changed", {
-        "slide": new_index,
-        "image": None
-    }, room=room)
+    emit("slide-changed", {"slide": new_index, "image": None}, room=room)
 
 
 @socketio.on("add-slide-with-image")
@@ -173,16 +192,11 @@ def add_slide_with_image(data):
     room = data["class_id"]
     image = data.get("image")
     ensure_room(room)
-
     slides = canvas_data[room]
     new_index = len(slides)
     slides[new_index] = image
     current_slide[room] = new_index
-
-    emit("slide-changed", {
-        "slide": new_index,
-        "image": image
-    }, room=room)
+    emit("slide-changed", {"slide": new_index, "image": image}, room=room)
 
 
 @socketio.on("change-slide")
@@ -190,15 +204,10 @@ def change_slide(data):
     room = data["class_id"]
     slide = data["slide"]
     ensure_room(room)
-
     slides = canvas_data[room]
     slide = max(0, min(slide, len(slides) - 1))
     current_slide[room] = slide
-
-    emit("slide-changed", {
-        "slide": slide,
-        "image": slides.get(slide)
-    }, room=room)
+    emit("slide-changed", {"slide": slide, "image": slides.get(slide)}, room=room)
 
 
 @socketio.on("delete-slide")
@@ -206,16 +215,14 @@ def delete_slide(data):
     room = data["class_id"]
     idx = data.get("slide", 0)
     ensure_room(room)
-
     slides = canvas_data[room]
+
     if len(slides) <= 1:
-        # Can't delete the last slide — just clear it
         slides[0] = None
         current_slide[room] = 0
         emit("slide-changed", {"slide": 0, "image": None}, room=room)
         return
 
-    # Rebuild dict without the deleted index
     new_slides = {}
     new_idx = 0
     for i in sorted(slides.keys()):
@@ -224,30 +231,135 @@ def delete_slide(data):
             new_idx += 1
     canvas_data[room] = new_slides
 
-    # Clamp current slide
     cur = current_slide[room]
     if cur >= idx:
         cur = max(0, cur - 1)
     current_slide[room] = cur
 
-    emit("slide-changed", {
-        "slide": cur,
-        "image": new_slides.get(cur)
-    }, room=room)
+    emit("slide-changed", {"slide": cur, "image": new_slides.get(cur)}, room=room)
 
 
 @socketio.on("get-slides")
 def get_slides(data):
     room = data["class_id"]
     ensure_room(room)
-
     slides = canvas_data[room]
     ordered = [slides.get(i) for i in sorted(slides.keys())]
+    emit("slides-list", {"slides": ordered, "current": current_slide.get(room, 0)})
 
-    emit("slides-list", {
-        "slides": ordered,
-        "current": current_slide.get(room, 0)
-    })
+
+# =========================
+# POLL SYSTEM
+# =========================
+
+@socketio.on("poll-start")
+def poll_start(data):
+    """
+    Teacher starts a poll.
+    data: { class_id, poll_id, poll_type, options, timer, question_num }
+    """
+    room = data["class_id"]
+    ensure_poll(room)
+
+    poll_state[room] = {
+        "poll_id": data["poll_id"],
+        "poll_type": data.get("poll_type"),
+        "options": data.get("options", []),
+        "timer": data.get("timer", 30),
+        "timer_remaining": data.get("timer", 30),
+        "question_num": data.get("question_num", 1),
+        "active": True,
+        "responses": {}
+    }
+
+    # Broadcast to ALL in room (including teacher for confirmation)
+    emit("poll-start", {
+        "poll_id": data["poll_id"],
+        "poll_type": data.get("poll_type"),
+        "options": data.get("options", []),
+        "timer": data.get("timer", 30),
+        "question_num": data.get("question_num", 1)
+    }, room=room, include_self=False)
+
+
+@socketio.on("poll-response")
+def poll_response(data):
+    """
+    Student submits poll answer.
+    data: { class_id, poll_id, user_id, answer (int index), name }
+    """
+    room = data["class_id"]
+    ensure_poll(room)
+
+    poll = poll_state[room]
+
+    # Validate poll is still active and IDs match
+    if not poll.get("active"):
+        return
+    if poll.get("poll_id") != data.get("poll_id"):
+        return
+
+    user_id = data.get("user_id") or request.sid
+    answer = data.get("answer")
+    name = data.get("name", "Student")
+
+    # Store response (one per user — last write wins if they somehow submit twice)
+    poll["responses"][user_id] = answer
+
+    # Store name mapping for leaderboard
+    if "_names" not in poll:
+        poll["_names"] = {}
+    poll["_names"][user_id] = name
+
+    # Relay to teacher so live bars update
+    emit("poll-response", {
+        "poll_id": data["poll_id"],
+        "user_id": user_id,
+        "answer": answer,
+        "name": name,
+        "total": len(poll["responses"])
+    }, room=room, include_self=True)
+
+
+@socketio.on("poll-end")
+def poll_end(data):
+    """
+    Teacher ends the poll (timer or manual).
+    data: { class_id, poll_id, correct (int), responses (dict) }
+    """
+    room = data["class_id"]
+    ensure_poll(room)
+
+    poll = poll_state[room]
+    poll["active"] = False
+    poll["correct"] = data.get("correct")
+
+    # Use server-side responses (authoritative) merged with client-side
+    server_responses = poll.get("responses", {})
+    client_responses = data.get("responses", {})
+
+    # Merge: server is authoritative but fill in any client-only entries
+    merged = {**client_responses, **server_responses}
+    poll["responses"] = merged
+
+    # Broadcast end + results to all students
+    emit("poll-end", {
+        "poll_id": data["poll_id"],
+        "correct": data.get("correct"),
+        "responses": merged
+    }, room=room, include_self=False)
+
+
+@socketio.on("show-leaderboard")
+def show_leaderboard(data):
+    """
+    Teacher broadcasts leaderboard to all students.
+    data: { class_id, leaderboard: [{rank, name, score, correct, wrong}] }
+    """
+    room = data["class_id"]
+    emit("show-leaderboard", {
+        "leaderboard": data.get("leaderboard", [])
+    }, room=room, include_self=False)
 
 
 # =========================
