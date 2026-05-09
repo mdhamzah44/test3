@@ -11,7 +11,10 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 socketio = SocketIO(
     app,
     cors_allowed_origins="*",
-    async_mode="gevent"
+    async_mode="gevent",
+    ping_timeout=60,
+    ping_interval=25,
+    max_http_buffer_size=50 * 1024 * 1024  # 50MB for large PDF/image uploads
 )
 
 # { class_id: { slide_index: image_dataURL_or_None } }
@@ -20,27 +23,13 @@ canvas_data = {}
 # { class_id: current_slide_index }
 current_slide = {}
 
-# =============================================
-# POLL STATE
-# { class_id: {
-#     poll_id, poll_type, options, timer,
-#     question_num, correct (None until ended),
-#     responses: { user_id: answer_index },
-#     active: bool
-# } }
-# =============================================
+# Poll state per class
 poll_state = {}
 
-# =============================================
-# HAND RAISE STATE
-# { class_id: { user_id: { name, socket_id, raised_at } } }
-# =============================================
+# Hand raise state per class
 hand_raise_state = {}
 
-# =============================================
-# VOICE CALL STATE
-# { class_id: { student_id, teacher_socket_id } }
-# =============================================
+# Voice call state per class
 voice_call_state = {}
 
 # Map socket_id → { class_id, user_id } for disconnect cleanup
@@ -49,7 +38,7 @@ sid_map = {}
 
 @app.route("/")
 def home():
-    return "Server Running ✅"
+    return "SmartEdu Socket Server ✅"
 
 
 # =========================
@@ -91,20 +80,17 @@ def join_room_handler(data):
     ensure_hand(room)
     ensure_voice(room)
 
-    # Track sid → room/user mapping for cleanup on disconnect
-    sid_map[request.sid] = {"class_id": room, "user_id": data.get("user_id", request.sid)}
+    sid_map[request.sid] = {
+        "class_id": room,
+        "user_id": data.get("user_id", request.sid)
+    }
 
     slide = current_slide[room]
     image = canvas_data[room].get(slide)
 
-    emit("load-canvas", {
-        "image": image,
-        "slide": slide
-    })
+    emit("load-canvas", {"image": image, "slide": slide})
 
-    emit("user-joined", {
-        "user_id": request.sid
-    }, room=room, include_self=False)
+    emit("user-joined", {"user_id": request.sid}, room=room, include_self=False)
 
     # If there's an active poll, send it to the newly joined student
     poll = poll_state.get(room, {})
@@ -117,15 +103,14 @@ def join_room_handler(data):
             "question_num": poll.get("question_num", 1)
         })
 
-    # Send current hand raise state to teacher (so teacher sees queue on reload)
+    # Re-send current hand raise state to teacher
     current_hands = hand_raise_state.get(room, {})
-    if current_hands:
-        for uid, info in current_hands.items():
-            emit("hand-raise", {
-                "user_id": uid,
-                "name": info.get("name", "Student"),
-                "raised": True
-            }, room=room, include_self=True)
+    for uid, info in current_hands.items():
+        emit("hand-raise", {
+            "user_id": uid,
+            "name": info.get("name", "Student"),
+            "raised": True
+        }, room=room, include_self=True)
 
 
 # =========================
@@ -145,7 +130,7 @@ def on_disconnect():
     # Clean up hand raise if this student had their hand up
     hands = hand_raise_state.get(room, {})
     uid_to_remove = None
-    for uid, hinfo in hands.items():
+    for uid, hinfo in list(hands.items()):
         if hinfo.get("socket_id") == sid:
             uid_to_remove = uid
             break
@@ -162,7 +147,6 @@ def on_disconnect():
     if voice.get("student_id") == info.get("user_id") or voice.get("student_socket") == sid:
         voice["student_id"] = None
         voice["teacher_socket_id"] = None
-        # Notify teacher
         emit("voice-ended-by-student", {
             "student_id": info.get("user_id", sid)
         }, room=room)
@@ -173,26 +157,17 @@ def on_disconnect():
 # =========================
 @socketio.on("offer")
 def offer(data):
-    emit("offer", {
-        "offer": data["offer"],
-        "from": request.sid
-    }, to=data["to"])
+    emit("offer", {"offer": data["offer"], "from": request.sid}, to=data["to"])
 
 
 @socketio.on("answer")
 def answer(data):
-    emit("answer", {
-        "answer": data["answer"],
-        "from": request.sid
-    }, to=data["to"])
+    emit("answer", {"answer": data["answer"], "from": request.sid}, to=data["to"])
 
 
 @socketio.on("ice-candidate")
 def ice(data):
-    emit("ice-candidate", {
-        "candidate": data["candidate"],
-        "from": request.sid
-    }, to=data["to"])
+    emit("ice-candidate", {"candidate": data["candidate"], "from": request.sid}, to=data["to"])
 
 
 # =========================
@@ -322,9 +297,55 @@ def get_slides(data):
 
 
 # =========================
+# UPLOAD PROGRESS (teacher → students)
+# FIX: relay teacher upload progress to all students
+# =========================
+@socketio.on("upload-start")
+def upload_start(data):
+    room = data["class_id"]
+    emit("upload-start", {
+        "label": data.get("label", "Loading content…")
+    }, room=room, include_self=False)
+
+
+@socketio.on("upload-progress")
+def upload_progress(data):
+    room = data["class_id"]
+    emit("upload-progress", {
+        "label": data.get("label", "Loading…"),
+        "pct": data.get("pct", 0)
+    }, room=room, include_self=False)
+
+
+# =========================
+# GET SLIDES FOR PDF (HTTP endpoint)
+# FIX: add this endpoint so students can download slides after class ends
+# =========================
+@app.route("/get-slides-pdf/<class_id>")
+def get_slides_pdf(class_id):
+    from flask import jsonify
+    ensure_room(class_id)
+    slides = canvas_data.get(class_id, {})
+    ordered = [slides.get(i) for i in sorted(slides.keys())]
+    # Filter out None slides
+    valid = [s for s in ordered if s]
+    return jsonify({"slides": valid, "total": len(valid)})
+
+
+# =========================
+# CLASS ENDED
+# FIX: teacher broadcasts class-end to all students
+# =========================
+@socketio.on("class-ended")
+def class_ended(data):
+    room = data["class_id"]
+    # Broadcast to all students in the room (not the teacher)
+    emit("class-ended", {}, room=room, include_self=False)
+
+
+# =========================
 # POLL SYSTEM
 # =========================
-
 @socketio.on("poll-start")
 def poll_start(data):
     room = data["class_id"]
@@ -402,13 +423,8 @@ def show_leaderboard(data):
 # =========================
 # HAND RAISE SYSTEM
 # =========================
-
 @socketio.on("hand-raise")
 def hand_raise(data):
-    """
-    Student raises or lowers hand.
-    data: { class_id, user_id, name, raised (bool) }
-    """
     room = data["class_id"]
     ensure_hand(room)
     user_id = data.get("user_id") or request.sid
@@ -424,7 +440,6 @@ def hand_raise(data):
     else:
         hand_raise_state[room].pop(user_id, None)
 
-    # Broadcast to everyone in the room (teacher will see it)
     emit("hand-raise", {
         "user_id": user_id,
         "name": name,
@@ -434,40 +449,30 @@ def hand_raise(data):
 
 @socketio.on("hand-dismissed")
 def hand_dismissed(data):
-    """
-    Teacher dismisses a student's hand without connecting.
-    data: { class_id, user_id }
-    """
     room = data["class_id"]
     user_id = data.get("user_id")
     ensure_hand(room)
 
-    # Remove from server-side queue
-    hand_raise_state[room].pop(user_id, None)
-
-    # Find the student's socket to notify them directly
     student_info = hand_raise_state.get(room, {}).get(user_id)
     student_sid = None
     if student_info:
         student_sid = student_info.get("socket_id")
 
+    # Remove from server-side queue AFTER getting socket_id
+    hand_raise_state[room].pop(user_id, None)
+
     if student_sid:
         emit("hand-dismissed", {"user_id": user_id}, to=student_sid)
     else:
-        # Broadcast to room — student will check if it's for them
         emit("hand-dismissed", {"user_id": user_id}, room=room, include_self=False)
 
 
 # =========================
 # VOICE CALL SYSTEM
+# FIX: proper relay and ICE candidate routing
 # =========================
-
 @socketio.on("voice-accept")
 def voice_accept(data):
-    """
-    Teacher accepts a student's hand raise to start voice call.
-    data: { class_id, student_id, teacher_socket }
-    """
     room = data["class_id"]
     student_id = data.get("student_id")
     ensure_voice(room)
@@ -484,26 +489,20 @@ def voice_accept(data):
             student_socket_id = info.get("socket_id")
             break
 
+    payload = {
+        "student_id": student_id,
+        "teacher_socket": request.sid
+    }
+
     if student_socket_id:
-        # Tell the specific student to create an offer
-        emit("voice-accept", {
-            "student_id": student_id,
-            "teacher_socket": request.sid
-        }, to=student_socket_id)
+        emit("voice-accept", payload, to=student_socket_id)
     else:
-        # Fallback: broadcast to room, student checks user_id
-        emit("voice-accept", {
-            "student_id": student_id,
-            "teacher_socket": request.sid
-        }, room=room, include_self=False)
+        # Fallback: broadcast to room
+        emit("voice-accept", payload, room=room, include_self=False)
 
 
 @socketio.on("voice-offer")
 def voice_offer(data):
-    """
-    Student sends WebRTC offer to teacher for voice call.
-    data: { class_id, student_id, offer }
-    """
     room = data["class_id"]
     voice = voice_call_state.get(room, {})
     teacher_sid = voice.get("teacher_socket_id")
@@ -517,14 +516,10 @@ def voice_offer(data):
 
 @socketio.on("voice-answer")
 def voice_answer(data):
-    """
-    Teacher sends WebRTC answer back to student.
-    data: { class_id, student_id, answer }
-    """
     room = data["class_id"]
     student_id = data.get("student_id")
 
-    # Find student socket
+    # Find student socket from hand raise state
     student_socket_id = None
     for uid, info in hand_raise_state.get(room, {}).items():
         if uid == student_id:
@@ -542,7 +537,7 @@ def voice_answer(data):
 def voice_ice(data):
     """
     ICE candidate relay for voice call (bidirectional).
-    data: { class_id, to (socket_id), student_id, candidate, from_teacher (bool) }
+    FIX: properly route ICE candidates both ways using TURN relay
     """
     room = data["class_id"]
     candidate = data.get("candidate")
@@ -550,7 +545,7 @@ def voice_ice(data):
     student_id = data.get("student_id")
 
     if from_teacher:
-        # Teacher → student: find student socket
+        # Teacher → student
         student_socket_id = None
         for uid, info in hand_raise_state.get(room, {}).items():
             if uid == student_id:
@@ -574,19 +569,13 @@ def voice_ice(data):
 
 @socketio.on("voice-end")
 def voice_end(data):
-    """
-    Teacher ends the voice call.
-    data: { class_id, student_id }
-    """
+    """Teacher ends voice call."""
     room = data["class_id"]
     student_id = data.get("student_id")
     ensure_voice(room)
 
-    # Clear state
+    voice = voice_call_state.get(room, {})
     voice_call_state[room] = {"student_id": None, "teacher_socket_id": None}
-
-    # Remove from hand queue
-    hand_raise_state.get(room, {}).pop(student_id, None)
 
     # Find student socket and notify
     student_socket_id = None
@@ -595,12 +584,15 @@ def voice_end(data):
             student_socket_id = info.get("socket_id")
             break
 
+    # Remove from hand queue
+    hand_raise_state.get(room, {}).pop(student_id, None)
+
     if student_socket_id:
         emit("voice-end", {"student_id": student_id}, to=student_socket_id)
     else:
         emit("voice-end", {"student_id": student_id}, room=room, include_self=False)
 
-    # Update teacher's hand queue
+    # Update everyone's hand queue
     emit("hand-raise", {
         "user_id": student_id,
         "name": "",
@@ -610,10 +602,7 @@ def voice_end(data):
 
 @socketio.on("voice-ended-by-student")
 def voice_ended_by_student(data):
-    """
-    Student ends the voice call from their side.
-    data: { class_id, student_id }
-    """
+    """Student ends voice call."""
     room = data["class_id"]
     student_id = data.get("student_id")
     ensure_voice(room)
@@ -621,15 +610,12 @@ def voice_ended_by_student(data):
     voice = voice_call_state.get(room, {})
     teacher_sid = voice.get("teacher_socket_id")
 
-    # Clear state
     voice_call_state[room] = {"student_id": None, "teacher_socket_id": None}
     hand_raise_state.get(room, {}).pop(student_id, None)
 
-    # Notify teacher
     if teacher_sid:
         emit("voice-ended-by-student", {"student_id": student_id}, to=teacher_sid)
 
-    # Update hand queue for everyone
     emit("hand-raise", {
         "user_id": student_id,
         "name": "",
